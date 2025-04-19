@@ -13,6 +13,11 @@ class TodoController(
 	@PostMapping
 	fun create(@RequestBody req: CreateTodoRequest): String =
 		todoService.create(req.title)
+
+	@GetMapping("/max-duration-this-month")
+	fun getMaxDurationTodosThisMonth(): List<MaxDurationTodoDto> {
+		return todoService.getMaxDurationTodosThisMonth()
+	}
 }
 
 data class CreateTodoRequest(val title: String)

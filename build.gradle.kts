@@ -6,6 +6,8 @@ plugins {
 	id("nu.studer.jooq") version "8.2"
 }
 
+extra["jooq.version"] = "3.18.6"
+
 group = "com.example"
 version = "0.0.1-SNAPSHOT"
 
@@ -60,7 +62,7 @@ jooq {
 					database.apply {
 						name = "org.jooq.meta.mysql.MySQLDatabase"
 						inputSchema = "todo_db"
-						includes = "todos"
+						includes = ".*"
 					}
 					target.apply {
 						packageName = "com.example.todo.jooq.generated"
