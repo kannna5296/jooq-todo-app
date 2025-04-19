@@ -8,7 +8,9 @@ import org.jooq.DatePart
 import org.jooq.impl.DSL.*
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.TemporalAdjusters
 
 @Repository
 class TodoRepository(
@@ -46,8 +48,9 @@ class TodoRepository(
 	// 今月最も時間がかかったタスクをサブクエリを使って取得する
 	// サブクエリを使って、今月最も時間がかかったタスクを取得する
 	fun fetchMostTimeConsumingTaskForThisMonth(): List<MaxDurationTodoDto> {
-		val currentMonthStart = LocalDateTime.of(2025, 4, 1, 0, 0)
-		val currentMonthEnd = LocalDateTime.of(2025, 4, 30, 23, 59)
+		val now = LocalDate.now()
+		val currentMonthStart = now.withDayOfMonth(1).atStartOfDay()
+		val currentMonthEnd = now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59)
 
 		val subquery = dsl
 			.select(
