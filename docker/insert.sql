@@ -1,3 +1,4 @@
+-- 手で流しに行くしかないやつ
 INSERT INTO users (id, name) VALUES
 (1, '太郎'),
 (2, '花子'),
