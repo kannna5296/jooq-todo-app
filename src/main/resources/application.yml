@@ -5,3 +5,7 @@ spring:
     password: password
   jooq:
     sql-dialect: mysql
+logging:
+  level:
+    org.jooq.tools.LoggerListener: DEBUG
+    org.jooq.tools: DEBUG
