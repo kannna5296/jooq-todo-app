@@ -5,7 +5,6 @@ import com.example.todo.jooq.generated.tables.Users.USERS
 import com.example.todo.jooq.generated.tables.TodoLogs.TODO_LOGS
 import org.jooq.DSLContext
 import org.jooq.DatePart
-import org.jooq.impl.DSL
 import org.jooq.impl.DSL.*
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
@@ -58,14 +57,13 @@ class TodoRepository(
 			TODO_LOGS.END_TIME.cast(Timestamp::class.java)
 		)
 
-		val rankField = DSL.rank().over()
+		val rankField = rowNumber().over()
 			.partitionBy(TODOS.USER_ID)
 			.orderBy(durationField.desc())
 
-		val result = dsl
+		val doneTaskByUser = dsl
 			.select(
-				USERS.ID.`as`("user_id"),
-				USERS.NAME.`as`("user_name"),
+				TODOS.USER_ID,
 				TODOS.ID.`as`("todo_id"),
 				TODOS.TITLE,
 				durationField.`as`("duration_in_minutes"),
@@ -73,12 +71,24 @@ class TodoRepository(
 			)
 			.from(TODOS)
 			.join(TODO_LOGS).on(TODOS.ID.eq(TODO_LOGS.TODO_ID))
-			.join(USERS).on(TODOS.USER_ID.eq(USERS.ID))
-			.where(TODOS.DONE.isTrue)
-			.and(TODO_LOGS.START_TIME.between(currentMonthStart, currentMonthEnd))
-			.fetch()
-			.filter { it.get("rank", Int::class.java) == 1 } // ユーザーごとの最大タスクだけ抽出
+			.where(
+				TODOS.DONE.isTrue
+					.and(TODO_LOGS.START_TIME.between(currentMonthStart, currentMonthEnd))
+			).asTable("doneTaskByUser")
 
+        // 重複を排除し、1位のタスクのみを取得
+		val result = dsl
+			.select(
+				USERS.ID.`as`("user_id"),
+				USERS.NAME.`as`("user_name"),
+				doneTaskByUser.field("todo_id"),
+				doneTaskByUser.field("title"),
+				doneTaskByUser.field("duration_in_minutes")
+			)
+			.from(doneTaskByUser)
+			.join(USERS).on(doneTaskByUser.field("user_id", Int::class.java)?.eq(USERS.ID))
+			.where(doneTaskByUser.field("rank", Int::class.java)?.eq(1))
+			.fetch()
 		// 結果をMaxDurationTodoDtoにマッピング
 		return result.map {
 			MaxDurationTodoDto(
