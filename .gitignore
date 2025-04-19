@@ -38,3 +38,9 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+/src/main/generated
+.idea
+*.iml
+*.log
+.env
