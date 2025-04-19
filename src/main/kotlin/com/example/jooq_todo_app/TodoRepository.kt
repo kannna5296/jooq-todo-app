@@ -5,11 +5,11 @@ import com.example.todo.jooq.generated.tables.Users.USERS
 import com.example.todo.jooq.generated.tables.TodoLogs.TODO_LOGS
 import org.jooq.DSLContext
 import org.jooq.DatePart
+import org.jooq.impl.DSL
 import org.jooq.impl.DSL.*
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.temporal.TemporalAdjusters
 
 @Repository
@@ -52,38 +52,32 @@ class TodoRepository(
 		val currentMonthStart = now.withDayOfMonth(1).atStartOfDay()
 		val currentMonthEnd = now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59)
 
-		val subquery = dsl
-			.select(
-				TODOS.USER_ID,
-				TODOS.ID.`as`("todo_id"),
-				TODOS.TITLE,
-				timestampDiff(
-					DatePart.MINUTE,
-					TODO_LOGS.START_TIME.cast(Timestamp::class.java),
-					TODO_LOGS.END_TIME.cast(Timestamp::class.java)
-				).`as`("duration_in_minutes")
-			)
-			.from(TODOS)
-			.join(TODO_LOGS).on(TODOS.ID.eq(TODO_LOGS.TODO_ID))
-			.where(TODOS.DONE.eq(1))  // 完了したタスク
-			.and(TODO_LOGS.START_TIME.between(
-				currentMonthStart,
-				currentMonthEnd
-			))  // 今月のタスクをフィルタ
-			.orderBy(field("duration_in_minutes").desc()) // 最も時間がかかったタスクを取得
-			.asTable("subquery") // サブクエリとして使う
+		val durationField = timestampDiff(
+			DatePart.MINUTE,
+			TODO_LOGS.START_TIME.cast(Timestamp::class.java),
+			TODO_LOGS.END_TIME.cast(Timestamp::class.java)
+		)
+
+		val rankField = DSL.rank().over()
+			.partitionBy(TODOS.USER_ID)
+			.orderBy(durationField.desc())
 
 		val result = dsl
 			.select(
 				USERS.ID.`as`("user_id"),
 				USERS.NAME.`as`("user_name"),
-				subquery.field("todo_id"),
-				subquery.field("title"),
-				subquery.field("duration_in_minutes")
+				TODOS.ID.`as`("todo_id"),
+				TODOS.TITLE,
+				durationField.`as`("duration_in_minutes"),
+				rankField.`as`("rank")
 			)
-			.from(subquery)
-			.join(USERS).on(subquery.field("user_id", Int::class.java)?.eq(USERS.ID)) // ユーザー情報を結合
-			.fetch() // 結果を取得
+			.from(TODOS)
+			.join(TODO_LOGS).on(TODOS.ID.eq(TODO_LOGS.TODO_ID))
+			.join(USERS).on(TODOS.USER_ID.eq(USERS.ID))
+			.where(TODOS.DONE.isTrue)
+			.and(TODO_LOGS.START_TIME.between(currentMonthStart, currentMonthEnd))
+			.fetch()
+			.filter { it.get("rank", Int::class.java) == 1 } // ユーザーごとの最大タスクだけ抽出
 
 		// 結果をMaxDurationTodoDtoにマッピング
 		return result.map {
